@@ -24,14 +24,11 @@ void setup() {
 
   Serial.println("Starting ESP32-S3 Thermistor CAN node...");
 
-  // if (!Can.begin()) {
-  //   Serial.println("CAN init failed!");
-  //   while (1);
-  // }
+  if (!Can.begin()) {
+    Serial.println("CAN init failed!");
+    while (1);
+  }
 
-  Can.begin();  // ignoring CAN status for now for testing without can transceiver
-
-  // CAN ID selection
   switch (subpackID) {
     case 'S1': CAN_outMsg1.id = 0x11; CAN_outMsg2.id = 0x12; break;
     case 'S2': CAN_outMsg1.id = 0x21; CAN_outMsg2.id = 0x22; break;
@@ -49,7 +46,6 @@ void setup() {
 void loop() {
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 
-  // ESP32 ADC is 12-bit (0–4095)
   adcValue = analogRead(ADC_PIN) * (3.3 / 4095.0);
 
   temperature =

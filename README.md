@@ -20,5 +20,5 @@
 - Upload firmware
 - Open Serial Monitor
 - Expected output:
-  - `Temperature (C): ...`
   - `ADC Voltage: ...`
+  - `Temperature (C): ...`

@@ -1,7 +1,7 @@
 #include "ESP32_CAN.h"
 
-#define CAN_TX_PIN GPIO_NUM_5
-#define CAN_RX_PIN GPIO_NUM_4
+#define CAN_TX_PIN GPIO_NUM_43
+#define CAN_RX_PIN GPIO_NUM_44
 
 bool ESP32_CAN::begin() {
   twai_general_config_t g_config =

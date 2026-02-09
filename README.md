@@ -12,8 +12,8 @@
 |--------|---------|
 | 3V3 | VCC |
 | GND | GND |
-| D5 (GPIO 5) | CAN TX |
-| D4 (GPIO 4) | CAN RX |
+| (GPIO 43) | CAN TX |
+| (GPIO 44) | CAN RX |
 
 ## Testing (No CAN Transceiver Connected)
 - Open the repo on Platform IO

@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include "ESP32_CAN.h"
 #include <math.h>
 
@@ -6,7 +7,7 @@ static CAN_message_t CAN_outMsg1;
 static CAN_message_t CAN_outMsg2;
 
 // ESP32-S3 pins
-#define ADC_PIN      A0     // ADC1_CH0
+#define ADC_PIN      A0
 
 #define LED_PIN      LED_BUILTIN
 #define SEND_DELAY   1000    // ms

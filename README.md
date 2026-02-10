@@ -2,7 +2,7 @@
 
 ## Hardware
 - Seeed Studio XIAO ESP32-S3  
-- Waveshare CAN transceiver 
+- Waveshare CAN transceiver SN65HVD230
 
 
 ## Wiring

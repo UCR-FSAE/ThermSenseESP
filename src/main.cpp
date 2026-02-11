@@ -9,6 +9,12 @@ static CAN_message_t CAN_outMsg2;
 // ESP32-S3 pins
 #define ADC_PIN      A0
 
+#define MUX_ENBLE   D8
+#define MUX_S3      D5
+#define MUX_S2      D4
+#define MUX_S1      D3
+#define MUX_S0      D2
+
 #define LED_PIN      LED_BUILTIN
 #define SEND_DELAY   1000    // ms
 
@@ -21,6 +27,16 @@ ESP32_CAN Can;
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
+  pinMode(MUX_ENBLE, OUTPUT);
+  pinMode(MUX_S3, OUTPUT);
+  pinMode(MUX_S2, OUTPUT);
+  pinMode(MUX_S1, OUTPUT);
+  pinMode(MUX_S0, OUTPUT);
+  digitalWrite(MUX_ENBLE, LOW);  // Enables the multiplexer
+  digitalWrite(MUX_S3, LOW);
+  digitalWrite(MUX_S2, LOW);
+  digitalWrite(MUX_S1, LOW);
+  digitalWrite(MUX_S0, LOW);
   Serial.begin(115200);
   delay(500);
   analogReadResolution(12);
@@ -52,19 +68,22 @@ void loop() {
 
   adcValue = analogRead(ADC_PIN) * (3.3 / 4095.0);
 
-  temperature =
+  // for (int i = 0; i < 6; i++) {  
+    temperature =
       (1.0 / ((1.0 / 298.15) +
       (1.0 / 3435.0) *
       log(((10000.0 * (3.3 / adcValue)) - 10000.0) / 10000.0))) - 273.15;
 
-  for (int i = 0; i < 6; i++) {
-    CAN_outMsg1.buf[i] = (uint8_t)temperature;
-  }
+  //   CAN_outMsg1.buf[i] = (uint8_t)temperature;
+  // }
+  CAN_outMsg1.buf[0] = (uint8_t)temperature; 
 
-  Serial.print("ADC Voltage: ");
-  Serial.println(adcValue, 3);
+  // Serial.print("ADC Voltage: ");
+  // Serial.println(adcValue, 3);
   Serial.print("Temperature (C): ");
   Serial.println(temperature, 2);
+  Serial.print("Raw ADC: ");
+  Serial.println(adcValue, 3);
 
   Can.write(CAN_outMsg1);
   delay(SEND_DELAY);

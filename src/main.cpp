@@ -62,7 +62,7 @@ void loop() {
   for (int i=0;i<16;i++) {
     raw += analogRead(ADC_PIN);
   }
-  float adcValue = raw/16.0f;
+  adcValue = raw/16.0f;
 
   if (adcValue<=0 || adcValue>=ADC_MAX) {
     Serial.println("Error: thermistor open or short circuit!");

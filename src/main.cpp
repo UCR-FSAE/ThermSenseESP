@@ -13,9 +13,14 @@ static CAN_message_t CAN_outMsg2;
 #define SEND_DELAY   1000    // ms
 
 // Steinhart-Hart coeefficients
-#define SH_A 8.7741e-4f
-#define SH_B 2.5323e-4f
-#define SH_C 1.8451e-7f
+// new ones
+#define SH_A 1.1395e-3f
+#define SH_B 2.3230e-4f
+#define SH_C 9.5816e-8f
+// old ones
+// #define SH_A 8.7741e-4f
+// #define SH_B 2.5323e-4f
+// #define SH_C 1.8451e-7f
 #define R_FIXED 10000.0f
 #define ADC_MAX 4095.0f
 

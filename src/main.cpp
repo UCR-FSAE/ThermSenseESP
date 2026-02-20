@@ -18,6 +18,18 @@ static CAN_message_t CAN_outMsg2;
 #define LED_PIN      LED_BUILTIN
 #define SEND_DELAY   1000    // ms
 
+// Steinhart-Hart coeefficients
+// new ones
+#define SH_A 1.1395e-3f
+#define SH_B 2.3230e-4f
+#define SH_C 9.5816e-8f
+// old ones
+// #define SH_A 8.7741e-4f
+// #define SH_B 2.5323e-4f
+// #define SH_C 1.8451e-7f
+#define R_FIXED 10000.0f
+#define ADC_MAX 4095.0f
+
 const int subpackID = 1;
 
 float adcValue = 0;
@@ -66,24 +78,35 @@ void setup() {
 void loop() {
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 
-  adcValue = analogRead(ADC_PIN) * (3.3 / 4095.0);
+  // reduce noise by taking average
+  int32_t raw =0;
+  for (int i=0;i<16;i++) {
+    raw += analogRead(ADC_PIN);
+  }
+  adcValue = raw/16.0f;
 
-  // for (int i = 0; i < 6; i++) {  
-    temperature =
-      (1.0 / ((1.0 / 298.15) +
-      (1.0 / 3435.0) *
-      log(((10000.0 * (3.3 / adcValue)) - 10000.0) / 10000.0))) - 273.15;
+  if (adcValue<=0 || adcValue>=ADC_MAX) {
+    Serial.println("Error: thermistor open or short circuit!");
+    delay(SEND_DELAY);
+    return;
+  }
+
+  float R = R_FIXED *adcValue/(ADC_MAX - adcValue);
+  float lnR = logf(R);
+  float inv_T = SH_A + SH_B*lnR + SH_C*lnR*lnR*lnR;
+  temperature = 1.0f/inv_T - 273.15f;
 
   //   CAN_outMsg1.buf[i] = (uint8_t)temperature;
   // }
   CAN_outMsg1.buf[0] = (uint8_t)temperature; 
 
-  // Serial.print("ADC Voltage: ");
-  // Serial.println(adcValue, 3);
-  Serial.print("Temperature (C): ");
-  Serial.println(temperature, 2);
-  Serial.print("Raw ADC: ");
-  Serial.println(adcValue, 3);
+  Serial.print("ADC Raw: ");
+  Serial.print(adcValue, 0);
+  Serial.print("  |  R: ");
+  Serial.print(R, 1);
+  Serial.print(" ohm  |  Temp: ");
+  Serial.print(temperature, 2);
+  Serial.println(" C");
 
   Can.write(CAN_outMsg1);
   delay(SEND_DELAY);

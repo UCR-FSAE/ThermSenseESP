@@ -45,10 +45,10 @@ void setup() {
   pinMode(MUX_S1, OUTPUT);
   pinMode(MUX_S0, OUTPUT);
   digitalWrite(MUX_ENBLE, LOW);  // Enables the multiplexer
-  digitalWrite(MUX_S3, LOW);
-  digitalWrite(MUX_S2, LOW);
-  digitalWrite(MUX_S1, LOW);
-  digitalWrite(MUX_S0, LOW);
+  // digitalWrite(MUX_S3, HIGH);
+  // digitalWrite(MUX_S2, LOW);
+  // digitalWrite(MUX_S1, HIGH);
+  // digitalWrite(MUX_S0, HIGH);
   Serial.begin(115200);
   delay(500);
   analogReadResolution(12);
@@ -78,9 +78,16 @@ void setup() {
 void loop() {
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
 
+  for (int i=0; i<12;i++) {
+    // selecting the mux channel
+    digitalWrite(MUX_S0, i%2);
+    digitalWrite(MUX_S1, (i/2)%2);
+    digitalWrite(MUX_S2, (i/4)%2);
+    digitalWrite(MUX_S3, (i/8)%2);
+  }
   // reduce noise by taking average
   int32_t raw =0;
-  for (int i=0;i<16;i++) {
+  for (int j=0;j<16;j++) {
     raw += analogRead(ADC_PIN);
   }
   adcValue = raw/16.0f;

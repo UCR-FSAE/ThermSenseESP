@@ -77,45 +77,92 @@ void setup() {
 
 void loop() {
   digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+  uint8_t temp[12] = {0};
 
   for (int i=0; i<12;i++) {
+    int channel = (i+1)%12;  // T12 has binary b0000, others are fine
     // selecting the mux channel
-    digitalWrite(MUX_S0, i%2);
-    digitalWrite(MUX_S1, (i/2)%2);
-    digitalWrite(MUX_S2, (i/4)%2);
-    digitalWrite(MUX_S3, (i/8)%2);
-  }
-  // reduce noise by taking average
-  int32_t raw =0;
-  for (int j=0;j<16;j++) {
-    raw += analogRead(ADC_PIN);
-  }
-  adcValue = raw/16.0f;
+    digitalWrite(MUX_S0, channel%2);
+    digitalWrite(MUX_S1, (channel/2)%2);
+    digitalWrite(MUX_S2, (channel/4)%2);
+    digitalWrite(MUX_S3, (channel/8)%2);
 
-  if (adcValue<=0 || adcValue>=ADC_MAX) {
-    Serial.println("Error: thermistor open or short circuit!");
-    delay(SEND_DELAY);
-    return;
-  }
+    // this delay is needed for the mux to settle after switching channels, otherwise the ADC reading will be unstable and inaccurate
+    // there might be channel bleeding
+    // without this, the channel numbers were mismatching
+    delayMicroseconds(20);
+    
+    // // discard the first reading after switching channels, it is usually inaccurate due to the residual charge in the ADC sample and hold capacitor from the previous channel
+    analogRead(ADC_PIN);
+    delayMicroseconds(20);
+    // reduce noise by taking average
+    int32_t raw =0;
+    for (int j=0;j<16;j++) {
+      raw += analogRead(ADC_PIN);
+    }
+    adcValue = raw/16.0f;
 
-  float R = R_FIXED *adcValue/(ADC_MAX - adcValue);
-  float lnR = logf(R);
-  float inv_T = SH_A + SH_B*lnR + SH_C*lnR*lnR*lnR;
-  temperature = 1.0f/inv_T - 273.15f;
+    if (adcValue<=0 || adcValue>=ADC_MAX) {
+      Serial.println("Error: thermistor open or short circuit!");
+      delay(SEND_DELAY);
+      temp[i] = 0;
+      continue;
+    }
+
+    float R = R_FIXED *adcValue/(ADC_MAX - adcValue);
+    float lnR = logf(R);
+    float inv_T = SH_A + SH_B*lnR + SH_C*lnR*lnR*lnR;
+    temperature = 1.0f/inv_T - 273.15f;
+    temp[i] = (uint8_t)(temperature);
+
+    Serial.print("Channel: ");
+    Serial.print(i+1);
+    Serial.print(" | Temp: ");
+    Serial.print(temperature, 2);
+    Serial.println(" C");
+    delay (100);
+  }
 
   //   CAN_outMsg1.buf[i] = (uint8_t)temperature;
   // }
-  CAN_outMsg1.buf[0] = (uint8_t)temperature; 
+  // CAN_outMsg1.buf[0] = (uint8_t)temperature; 
 
-  Serial.print("ADC Raw: ");
-  Serial.print(adcValue, 0);
-  Serial.print("  |  R: ");
-  Serial.print(R, 1);
-  Serial.print(" ohm  |  Temp: ");
-  Serial.print(temperature, 2);
-  Serial.println(" C");
+  // Serial.print("ADC Raw: ");
+  // Serial.print(adcValue, 0);
+  // Serial.print("  |  R: ");
+  // Serial.print(R, 1);
+  // Serial.print(" ohm  |  Temp: ");
+  // Serial.print(temperature, 2);
+  // Serial.println(" C");
 
-  Can.write(CAN_outMsg1);
+  // Can.write(CAN_outMsg1);
+
+  for (int i = 0; i < 6; i++) {
+      CAN_outMsg1.buf[i] = temp[i];
+      CAN_outMsg2.buf[i] = temp[i + 6];
+  }
+
+  Serial.println(Can.write(CAN_outMsg1) ? "MSG1 sent" : "MSG1 FAILED");
+  Serial.println(Can.write(CAN_outMsg2) ? "MSG2 sent" : "MSG2 FAILED");
+
+  Serial.print("MSG1 (0x");
+  Serial.print(CAN_outMsg1.id, HEX);
+  Serial.print("): ");
+  for (int i = 0; i < CAN_outMsg1.len; i++) {
+      Serial.print(CAN_outMsg1.buf[i]);
+      Serial.print(" ");
+  }
+  Serial.println();
+
+  Serial.print("MSG2 (0x");
+  Serial.print(CAN_outMsg2.id, HEX);
+  Serial.print("): ");
+  for (int i = 0; i < CAN_outMsg2.len; i++) {
+      Serial.print(CAN_outMsg2.buf[i]);
+      Serial.print(" ");
+  }
+  Serial.println();
   delay(SEND_DELAY);
+  
 }
 

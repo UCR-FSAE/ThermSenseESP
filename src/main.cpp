@@ -15,6 +15,13 @@ static CAN_message_t CAN_outMsg2;
 #define MUX_S1      D3
 #define MUX_S0      D2
 
+#define SUBPACK1_ID   D19
+#define SUBPACK2_ID   D8
+#define SUBPACK3_ID   D18
+#define SUBPACK4_ID   D9
+#define SUBPACK5_ID   D17
+#define SUBPACK6_ID   D10
+
 #define LED_PIN      LED_BUILTIN
 #define SEND_DELAY   1000    // ms
 
@@ -29,8 +36,6 @@ static CAN_message_t CAN_outMsg2;
 // #define SH_C 1.8451e-7f
 #define R_FIXED 10000.0f
 #define ADC_MAX 4095.0f
-
-const int subpackID = 1;
 
 float adcValue = 0;
 float temperature = 0;
@@ -56,18 +61,29 @@ void setup() {
 
   Serial.println("Starting ESP32-S3 Thermistor CAN node...");
 
+  // set subpack id pins as inputs
+  pinMode(SUBPACK1_ID, INPUT);
+  pinMode(SUBPACK2_ID, INPUT);
+  pinMode(SUBPACK3_ID, INPUT);
+  pinMode(SUBPACK4_ID, INPUT);
+  pinMode(SUBPACK5_ID, INPUT);
+  pinMode(SUBPACK6_ID, INPUT);
+
+  // read subpack id pins, decide which subpack this node belongs to
+  if (digitalRead(SUBPACK1_ID) == LOW) { CAN_outMsg1.id = 0x11; CAN_outMsg2.id = 0x12; } 
+  else if (digitalRead(SUBPACK2_ID) == LOW) { CAN_outMsg1.id = 0x21; CAN_outMsg2.id = 0x22; } 
+  else if (digitalRead(SUBPACK3_ID) == LOW) { CAN_outMsg1.id = 0x31; CAN_outMsg2.id = 0x32; } 
+  else if (digitalRead(SUBPACK4_ID) == LOW) { CAN_outMsg1.id = 0x41; CAN_outMsg2.id = 0x42; } 
+  else if (digitalRead(SUBPACK5_ID) == LOW) { CAN_outMsg1.id = 0x51; CAN_outMsg2.id = 0x52; } 
+  else if (digitalRead(SUBPACK6_ID) == LOW) { CAN_outMsg1.id = 0x61; CAN_outMsg2.id = 0x62; } 
+  else {
+    Serial.println("Error: No Subpack ID pin is LOW! Defaulting to Subpack ID 1.");
+    CAN_outMsg1.id = 0x11; CAN_outMsg2.id = 0x12;
+  }
+
   if (!Can.begin()) {
     Serial.println("CAN init failed!");
     while (1);
-  }
-
-  switch (subpackID) {
-    case 1: CAN_outMsg1.id = 0x11; CAN_outMsg2.id = 0x12; break;
-    case 2: CAN_outMsg1.id = 0x21; CAN_outMsg2.id = 0x22; break;
-    case 3: CAN_outMsg1.id = 0x31; CAN_outMsg2.id = 0x32; break;
-    case 4: CAN_outMsg1.id = 0x41; CAN_outMsg2.id = 0x42; break;
-    case 5: CAN_outMsg1.id = 0x51; CAN_outMsg2.id = 0x52; break;
-    case 6: CAN_outMsg1.id = 0x61; CAN_outMsg2.id = 0x62; break;
   }
 
   CAN_outMsg1.len = CAN_outMsg2.len = 6;

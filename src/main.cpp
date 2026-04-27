@@ -15,6 +15,8 @@ static CAN_message_t CAN_outMsg2;
 #define MUX_S1      D3
 #define MUX_S0      D2
 
+#define FAULT_PIN   D10
+
 #define LED_PIN      LED_BUILTIN
 #define SEND_DELAY   1000    // ms
 
@@ -44,6 +46,8 @@ void setup() {
   pinMode(MUX_S2, OUTPUT);
   pinMode(MUX_S1, OUTPUT);
   pinMode(MUX_S0, OUTPUT);
+  pinMode(FAULT_PIN, OUTPUT_OPEN_DRAIN);
+  digitalWrite(FAULT_PIN, HIGH);  // set to high to disable the fault pin, it is active low
   digitalWrite(MUX_ENBLE, LOW);  // Enables the multiplexer
   // digitalWrite(MUX_S3, HIGH);
   // digitalWrite(MUX_S2, LOW);
@@ -113,6 +117,13 @@ void loop() {
     float lnR = logf(R);
     float inv_T = SH_A + SH_B*lnR + SH_C*lnR*lnR*lnR;
     temperature = 1.0f/inv_T - 273.15f;
+
+    if(temperature >30){
+      Serial.println("Over temperature detected on channel ");
+      Serial.println(i+1);
+      digitalWrite(FAULT_PIN, LOW);  // set fault pin low to indicate over-temperature, it is active low
+      Serial.println("Fault pin set LOW");
+    }
     temp[i] = (uint8_t)(temperature);
 
     Serial.print("Channel: ");

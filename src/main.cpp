@@ -7,15 +7,17 @@ static CAN_message_t CAN_outMsg1;
 static CAN_message_t CAN_outMsg2;
 
 // ESP32-S3 pins
-#define ADC_PIN      A0
+#define ADC_PIN      A9
 
-#define MUX_ENBLE   D8
-#define MUX_S3      D5
-#define MUX_S2      D4
-#define MUX_S1      D3
-#define MUX_S0      D2
+#define MUX_ENBLE   40
+#define MUX_S3      D2
+#define MUX_S2      39
+#define MUX_S1      D1
+#define MUX_S0      38
 
-#define FAULT_PIN   D10
+#define FAULT_PIN   D5
+
+#define fault_temp 60.0f
 
 #define LED_PIN      LED_BUILTIN
 #define SEND_DELAY   1000    // ms
@@ -41,7 +43,7 @@ ESP32_CAN Can;
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
-  pinMode(MUX_ENBLE, OUTPUT);
+  pinMode(MUX_ENBLE, OUTPUT); 
   pinMode(MUX_S3, OUTPUT);
   pinMode(MUX_S2, OUTPUT);
   pinMode(MUX_S1, OUTPUT);
@@ -118,7 +120,7 @@ void loop() {
     float inv_T = SH_A + SH_B*lnR + SH_C*lnR*lnR*lnR;
     temperature = 1.0f/inv_T - 273.15f;
 
-    if(temperature >30){
+    if(temperature > fault_temp){
       Serial.println("Over temperature detected on channel ");
       Serial.println(i+1);
       digitalWrite(FAULT_PIN, LOW);  // set fault pin low to indicate over-temperature, it is active low

@@ -1,165 +1,107 @@
 #include <Arduino.h>
-#include "ESP32_CAN.h"
-#include <math.h>
+#include "driver/twai.h"
 
-// CAN messages
-static CAN_message_t CAN_outMsg1;
-static CAN_message_t CAN_outMsg2;
+// ESP32 -> transceiver TXD/RXD pins
+static const gpio_num_t CAN_TX = GPIO_NUM_4;
+static const gpio_num_t CAN_RX = GPIO_NUM_5;
 
-// ESP32-S3 pins
-#define ADC_PIN      A9
+static const uint32_t SEND_PERIOD_MS = 5; // scope-friendly burst rate
 
-#define MUX_ENBLE   40
-#define MUX_S3      D2
-#define MUX_S2      39
-#define MUX_S1      D1
-#define MUX_S0      38
+static void print_status(const char* where) {
+  twai_status_info_t st;
+  if (twai_get_status_info(&st) == ESP_OK) {
+    Serial.printf("[%s] state=%d tx_err=%d rx_err=%d bus_err=%lu tx_failed=%lu rx_missed=%lu\n",
+                  where, (int)st.state, (int)st.tx_error_counter, (int)st.rx_error_counter,
+                  (unsigned long)st.bus_error_count,
+                  (unsigned long)st.tx_failed_count,
+                  (unsigned long)st.rx_missed_count);
+  }
+}
 
-#define FAULT_PIN   D5
+static bool twai_up = false;
 
-#define fault_temp 60.0f
+static bool twai_begin_no_ack_500k() {
+  twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX, CAN_RX, TWAI_MODE_NO_ACK);
+  g.tx_queue_len = 25;
+  g.rx_queue_len = 25;
 
-#define LED_PIN      LED_BUILTIN
-#define SEND_DELAY   1000    // ms
+  twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
+  twai_filter_config_t f = TWAI_FILTER_CONFIG_ACCEPT_ALL();
 
-// Steinhart-Hart coeefficients
-// new ones
-#define SH_A 1.1395e-3f
-#define SH_B 2.3230e-4f
-#define SH_C 9.5816e-8f
-// old ones
-// #define SH_A 8.7741e-4f
-// #define SH_B 2.5323e-4f
-// #define SH_C 1.8451e-7f
-#define R_FIXED 10000.0f
-#define ADC_MAX 4095.0f
+  esp_err_t err = twai_driver_install(&g, &t, &f);
+  Serial.printf("twai_driver_install: %s\n", esp_err_to_name(err));
+  if (err != ESP_OK) return false;
 
-const int subpackID = 1;
+  err = twai_start();
+  Serial.printf("twai_start: %s\n", esp_err_to_name(err));
+  if (err != ESP_OK) return false;
 
-float adcValue = 0;
-float temperature = 0;
+  twai_up = true;
+  Serial.println("TWAI started: 500 kbit, NO_ACK, burst TX for scope.");
+  print_status("after_start");
+  return true;
+}
 
-ESP32_CAN Can;
+static void twai_restart() {
+  Serial.println("[TWAI] BUS-OFF -> restarting driver...");
+  twai_up = false;
+
+  twai_stop();
+  twai_driver_uninstall();
+  delay(50);
+
+  twai_begin_no_ack_500k();
+}
 
 void setup() {
-  pinMode(LED_PIN, OUTPUT);
-  pinMode(MUX_ENBLE, OUTPUT); 
-  pinMode(MUX_S3, OUTPUT);
-  pinMode(MUX_S2, OUTPUT);
-  pinMode(MUX_S1, OUTPUT);
-  pinMode(MUX_S0, OUTPUT);
-  pinMode(FAULT_PIN, OUTPUT_OPEN_DRAIN);
-  digitalWrite(FAULT_PIN, HIGH);  // set to high to disable the fault pin, it is active low
-  digitalWrite(MUX_ENBLE, LOW);  // Enables the multiplexer
-
   Serial.begin(115200);
-  delay(500);
-  analogReadResolution(12);
-  analogSetAttenuation(ADC_11db);
+  delay(300);
 
-  Serial.println("Starting ESP32-S3 Thermistor CAN node...");
-
-  if (!Can.begin()) {
-    Serial.println("CAN init failed!");
-    while (1);
-  }
-
-  // switch (subpackID) {
-  //   case 1: CAN_outMsg1.id = 0x11; CAN_outMsg2.id = 0x12; break;
-  //   case 2: CAN_outMsg1.id = 0x21; CAN_outMsg2.id = 0x22; break;
-  //   case 3: CAN_outMsg1.id = 0x31; CAN_outMsg2.id = 0x32; break;
-  //   case 4: CAN_outMsg1.id = 0x41; CAN_outMsg2.id = 0x42; break;
-  //   case 5: CAN_outMsg1.id = 0x51; CAN_outMsg2.id = 0x52; break;
-  //   case 6: CAN_outMsg1.id = 0x61; CAN_outMsg2.id = 0x62; break;
-  // }
-
-  CAN_outMsg1.len = CAN_outMsg2.len = 6;
-
-  Serial.println("Setup complete. Sending thermistor data over CAN.");
+  twai_begin_no_ack_500k();
 }
 
 void loop() {
-  digitalWrite(LED_PIN, !digitalRead(LED_PIN));
-  uint8_t temp[12] = {0};
+  static uint8_t ctr = 0;
 
-  // for (int i=0; i<12;i++) {
-  //   int channel = (i+1)%12;  // T12 has binary b0000, others are fine
-  //   // selecting the mux channel
-  //   digitalWrite(MUX_S0, channel%2);
-  //   digitalWrite(MUX_S1, (channel/2)%2);
-  //   digitalWrite(MUX_S2, (channel/4)%2);
-  //   digitalWrite(MUX_S3, (channel/8)%2);
-
-  //   // this delay is needed for the mux to settle after switching channels, otherwise the ADC reading will be unstable and inaccurate
-  //   // there might be channel bleeding
-  //   // without this, the channel numbers were mismatching
-  //   delayMicroseconds(20);
-    
-  //   // // discard the first reading after switching channels, it is usually inaccurate due to the residual charge in the ADC sample and hold capacitor from the previous channel
-  //   analogRead(ADC_PIN);
-  //   delayMicroseconds(20);
-  //   // reduce noise by taking average
-  //   int32_t raw =0;
-  //   for (int j=0;j<16;j++) {
-  //     raw += analogRead(ADC_PIN);
-  //   }
-  //   adcValue = raw/16.0f;
-
-  //   if (adcValue<=0 || adcValue>=ADC_MAX) {
-  //     Serial.println("Error: thermistor open or short circuit!");
-  //     delay(SEND_DELAY);
-  //     temp[i] = 0;
-  //     continue;
-  //   }
-
-  //   float R = R_FIXED *adcValue/(ADC_MAX - adcValue);
-  //   float lnR = logf(R);
-  //   float inv_T = SH_A + SH_B*lnR + SH_C*lnR*lnR*lnR;
-  //   temperature = 1.0f/inv_T - 273.15f;
-
-  //   if(temperature > fault_temp){
-  //     Serial.println("Over temperature detected on channel ");
-  //     Serial.println(i+1);
-  //     digitalWrite(FAULT_PIN, LOW);  // set fault pin low to indicate over-temperature, it is active low
-  //     Serial.println("Fault pin set LOW");
-  //   }
-  //   temp[i] = (uint8_t)(temperature);
-
-  //   Serial.print("Channel: ");
-  //   Serial.print(i+1);
-  //   Serial.print(" | Temp: ");
-  //   Serial.print(temperature, 2);
-  //   Serial.println(" C");
-  //   delay (100);
-  // }
-
-
-  for (int i = 0; i < 6; i++) {
-      CAN_outMsg1.buf[i] = temp[i];
-      CAN_outMsg2.buf[i] = temp[i + 6];
+  // Check state; if bus-off, restart
+  twai_status_info_t st;
+  if (twai_up && twai_get_status_info(&st) == ESP_OK) {
+    if (st.state == TWAI_STATE_BUS_OFF) {
+      print_status("bus_off_detected");
+      twai_restart();
+      delay(10);
+      return;
+    }
   }
 
-  Serial.println(Can.write(CAN_outMsg1) ? "MSG1 sent" : "MSG1 FAILED");
-  Serial.println(Can.write(CAN_outMsg2) ? "MSG2 sent" : "MSG2 FAILED");
+  // Build message
+  twai_message_t msg;
+  memset(&msg, 0, sizeof(msg));
+  msg.identifier = 0x123;
+  msg.data_length_code = 8;
+  msg.flags = 0;
 
-  Serial.print("MSG1 (0x");
-  Serial.print(CAN_outMsg1.id, HEX);
-  Serial.print("): ");
-  for (int i = 0; i < CAN_outMsg1.len; i++) {
-      Serial.print(CAN_outMsg1.buf[i]);
-      Serial.print(" ");
-  }
-  Serial.println();
+  msg.data[0] = ctr++;
+  msg.data[1] = 0xAA;
+  msg.data[2] = 0x55;
+  msg.data[3] = 0x00;
+  msg.data[4] = 0x11;
+  msg.data[5] = 0x22;
+  msg.data[6] = 0x33;
+  msg.data[7] = 0x44;
 
-  Serial.print("MSG2 (0x");
-  Serial.print(CAN_outMsg2.id, HEX);
-  Serial.print("): ");
-  for (int i = 0; i < CAN_outMsg2.len; i++) {
-      Serial.print(CAN_outMsg2.buf[i]);
-      Serial.print(" ");
+  // Try transmit
+  esp_err_t err = twai_transmit(&msg, pdMS_TO_TICKS(10));
+  if (err != ESP_OK) {
+    Serial.printf("[TX] FAILED: %s\n", esp_err_to_name(err));
+    print_status("tx_fail");
+
+    // If driver says invalid state, we're likely bus-off already-restart
+    if (err == ESP_ERR_INVALID_STATE) {
+      twai_restart();
+    }
+    delay(20);
   }
-  Serial.println();
-  delay(SEND_DELAY);
-  
+
+  delay(SEND_PERIOD_MS);
 }
-

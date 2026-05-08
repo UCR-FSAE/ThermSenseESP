@@ -2,18 +2,18 @@
 #include <math.h>
 #include "driver/twai.h"
 
-static const gpio_num_t CAN_TX = GPIO_NUM_4;
-static const gpio_num_t CAN_RX = GPIO_NUM_5;
+static const gpio_num_t CAN_TX = GPIO_NUM_43;  // D6
+static const gpio_num_t CAN_RX = GPIO_NUM_44;  // D7
 
-static constexpr uint8_t ADC_PIN = GPIO_NUM_8;
+static constexpr uint8_t ADC_PIN = GPIO_NUM_8;  // D9 or A9
 
-static constexpr uint8_t MUX_ENBLE = GPIO_NUM_40;
-static constexpr uint8_t MUX_S3 = GPIO_NUM_3;
-static constexpr uint8_t MUX_S2 = GPIO_NUM_39;
-static constexpr uint8_t MUX_S1 = GPIO_NUM_2;
-static constexpr uint8_t MUX_S0 = GPIO_NUM_38;
+static constexpr uint8_t MUX_ENBLE = GPIO_NUM_40;  // D13
+static constexpr uint8_t MUX_S3 = GPIO_NUM_3;  // D2
+static constexpr uint8_t MUX_S2 = GPIO_NUM_39;  // D12
+static constexpr uint8_t MUX_S1 = GPIO_NUM_2;  // D1
+static constexpr uint8_t MUX_S0 = GPIO_NUM_38;  // D11
 
-static constexpr uint8_t FAULT_PIN = GPIO_NUM_6;
+static constexpr uint8_t FAULT_PIN = GPIO_NUM_6;  // D5
 static constexpr float FAULT_TEMP = 60.0f;
 
 static constexpr uint32_t SEND_DELAY_MS = 1000;

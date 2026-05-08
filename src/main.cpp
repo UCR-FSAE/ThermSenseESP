@@ -137,5 +137,23 @@ void loop() {
   Serial.println(err1 == ESP_OK ? "MSG1 sent" : "MSG1 FAILED");
   Serial.println(err2 == ESP_OK ? "MSG2 sent" : "MSG2 FAILED");
 
+  Serial.print("MSG1 (0x");
+  Serial.print(CAN_outMsg1.identifier, HEX);
+  Serial.print("): ");
+  for (int i = 0; i < CAN_outMsg1.data_length_code; i++) {
+      Serial.print(CAN_outMsg1.data[i]);
+      Serial.print(" ");
+  }
+  Serial.println();
+
+  Serial.print("MSG2 (0x");
+  Serial.print(CAN_outMsg2.identifier, HEX);
+  Serial.print("): ");
+  for (int i = 0; i < CAN_outMsg2.data_length_code; i++) {
+      Serial.print(CAN_outMsg2.data[i]);
+      Serial.print(" ");
+  }
+  Serial.println();
+
   delay(SEND_DELAY_MS);
 }

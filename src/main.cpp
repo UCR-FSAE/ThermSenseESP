@@ -14,7 +14,7 @@ static constexpr uint8_t MUX_S1 = GPIO_NUM_2;  // D1
 static constexpr uint8_t MUX_S0 = GPIO_NUM_38;  // D11
 
 static constexpr uint8_t FAULT_PIN = GPIO_NUM_6;  // D5
-static constexpr float FAULT_TEMP = 20.0f;
+static constexpr float FAULT_TEMP = 60.0f;
 
 static constexpr uint32_t SEND_DELAY_MS = 5;
 

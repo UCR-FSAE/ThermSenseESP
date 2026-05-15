@@ -2,13 +2,13 @@
 #include <math.h>
 #include "driver/twai.h"
 
-static const gpio_num_t CAN_TX = GPIO_NUM_4;  // D3
-static const gpio_num_t CAN_RX = GPIO_NUM_5;  // D4
+static const gpio_num_t CAN_TX = GPIO_NUM_43;  // D6
+static const gpio_num_t CAN_RX = GPIO_NUM_44;  // D7
 
-static constexpr uint8_t ADC_PIN = GPIO_NUM_8;  // D9 or A9
+static constexpr uint8_t ADC_PIN = GPIO_NUM_4;  // D3 or A3
 
 static constexpr uint8_t MUX_ENBLE = GPIO_NUM_40;  // D13
-static constexpr uint8_t MUX_S3 = GPIO_NUM_3;  // D2
+static constexpr uint8_t MUX_S3 = GPIO_NUM_41;  // D14
 static constexpr uint8_t MUX_S2 = GPIO_NUM_39;  // D12
 static constexpr uint8_t MUX_S1 = GPIO_NUM_2;  // D1
 static constexpr uint8_t MUX_S0 = GPIO_NUM_38;  // D11
@@ -24,7 +24,7 @@ static constexpr float SH_C = 9.5816e-8f;
 static constexpr float R_FIXED = 10000.0f;
 static constexpr float ADC_MAX = 4095.0f;
 
-static const int subpackID = 1;
+static int subpackID = 1;
 
 static twai_message_t CAN_outMsg1;
 static twai_message_t CAN_outMsg2;
@@ -95,6 +95,21 @@ void setup() {
 
   memset(&CAN_outMsg1, 0, sizeof(CAN_outMsg1));
   memset(&CAN_outMsg2, 0, sizeof(CAN_outMsg2));
+
+  pinMode(GPIO_NUM_11, INPUT);  // D19
+  pinMode(GPIO_NUM_7, INPUT);  // D8
+  pinMode(GPIO_NUM_12, INPUT);  // D18
+  pinMode(GPIO_NUM_8, INPUT);  // D9
+  pinMode(GPIO_NUM_13, INPUT);  // D17
+  pinMode(GPIO_NUM_9, INPUT);  // D10
+
+  if (digitalRead(GPIO_NUM_11) == HIGH) subpackID = 1;
+  else if (digitalRead(GPIO_NUM_7) == HIGH) subpackID = 2;
+  else if (digitalRead(GPIO_NUM_12) == HIGH) subpackID = 3;
+  else if (digitalRead(GPIO_NUM_8) == HIGH) subpackID = 4;
+  else if (digitalRead(GPIO_NUM_13) == HIGH) subpackID = 5;
+  else if (digitalRead(GPIO_NUM_9) == HIGH) subpackID = 6;
+  else subpackID = 1;  // default to 1 if no pin is high
 
   switch (subpackID) {
     case 1: CAN_outMsg1.identifier = 0x11; CAN_outMsg2.identifier = 0x12; break;

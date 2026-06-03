@@ -5,44 +5,32 @@
 static const gpio_num_t CAN_TX = GPIO_NUM_43;  // D6
 static const gpio_num_t CAN_RX = GPIO_NUM_44;  // D7
 
-static constexpr uint8_t ADC_PIN = GPIO_NUM_4;  // D3 or A3
+static constexpr uint8_t ADC_PIN = GPIO_NUM_4;  // D3/A3
 
-static constexpr uint8_t MUX_ENBLE = GPIO_NUM_40;  // D13
-<<<<<<< ours
+static constexpr uint8_t MUX_EN = GPIO_NUM_40;  // D13
 static constexpr uint8_t MUX_S3 = GPIO_NUM_41;  // D14
 static constexpr uint8_t MUX_S2 = GPIO_NUM_39;  // D12
-static constexpr uint8_t MUX_S1 = GPIO_NUM_2;  // D1
+static constexpr uint8_t MUX_S1 = GPIO_NUM_2;   // D1
 static constexpr uint8_t MUX_S0 = GPIO_NUM_38;  // D11
-=======
-static constexpr uint8_t MUX_S3 = GPIO_NUM_41;     // D14
-static constexpr uint8_t MUX_S2 = GPIO_NUM_39;     // D12
-static constexpr uint8_t MUX_S1 = GPIO_NUM_2;      // D1
-static constexpr uint8_t MUX_S0 = GPIO_NUM_38;     // D11
->>>>>>> theirs
 
 static constexpr uint8_t FAULT_PIN = GPIO_NUM_6;  // D5
-static constexpr float FAULT_TEMP = 60.0f;
+static constexpr float FAULT_TEMP_C = 60.0f;
 
-<<<<<<< ours
-static constexpr uint32_t SEND_DELAY_MS = 5;
-=======
 static constexpr uint8_t NUM_SUBPACKS = 6;
-static constexpr uint8_t THERMISTORS_PER_SUBPACK = 12;
-static constexpr uint8_t TOTAL_THERMISTORS = NUM_SUBPACKS * THERMISTORS_PER_SUBPACK;
+static constexpr uint8_t TEMPS_PER_SUBPACK = 12;
+static constexpr uint8_t TOTAL_TEMPS = NUM_SUBPACKS * TEMPS_PER_SUBPACK;
 
-static constexpr uint32_t SUBPACK_SEND_PERIOD_MS = 100;
-static constexpr uint32_t ORION_ADDR_CLAIM_PERIOD_MS = 200;
+static constexpr uint32_t SUBPACK_TX_PERIOD_MS = 100;
+static constexpr uint32_t ORION_ADDRESS_PERIOD_MS = 200;
 static constexpr uint32_t ORION_SUMMARY_PERIOD_MS = 100;
 static constexpr uint32_t ORION_GENERAL_PERIOD_MS = 100;
-static constexpr uint32_t DEBUG_PRINT_PERIOD_MS = 1000;
-static constexpr uint32_t THERMISTOR_STALE_MS = 2000;
+static constexpr uint32_t STALE_TEMP_MS = 2000;
 
-static constexpr uint8_t ORION_MODULE_NUMBER = 0x00;
-static constexpr uint8_t ORION_SOURCE_ADDRESS = 0x80;
-static constexpr uint32_t ORION_ADDR_CLAIM_ID = 0x18EEFF80;
+static constexpr uint32_t ORION_ADDRESS_ID = 0x18EEFF80;
 static constexpr uint32_t ORION_SUMMARY_ID = 0x1839F380;
 static constexpr uint32_t ORION_GENERAL_ID = 0x1838F380;
->>>>>>> theirs
+static constexpr uint8_t ORION_MODULE_NUMBER = 0;
+static constexpr uint8_t ORION_SOURCE_ADDRESS = 0x80;
 
 static constexpr float SH_A = 1.1395e-3f;
 static constexpr float SH_B = 2.3230e-4f;
@@ -50,52 +38,35 @@ static constexpr float SH_C = 9.5816e-8f;
 static constexpr float R_FIXED = 10000.0f;
 static constexpr float ADC_MAX = 4095.0f;
 
-<<<<<<< ours
-static int subpackID = 1;
-
-static twai_message_t CAN_outMsg1;
-static twai_message_t CAN_outMsg2;
-static float adcValue = 0;
-static float temperature = 0;
-
-static bool twai_initialized = false;
-
-static bool init_can() {
-  twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX, CAN_RX, TWAI_MODE_NO_ACK);
-  g.tx_queue_len = 25;
-  g.rx_queue_len = 25;
-=======
-static uint8_t subpackID = 1;
+static uint8_t subpackId = 1;
 static bool isMaster = false;
-static bool twai_initialized = false;
+static bool canOk = false;
 
-static int8_t localTemps[THERMISTORS_PER_SUBPACK];
-static int8_t thermistorTemps[TOTAL_THERMISTORS];
-static bool thermistorValid[TOTAL_THERMISTORS];
-static uint32_t thermistorLastSeen[TOTAL_THERMISTORS];
+static int8_t localTemps[TEMPS_PER_SUBPACK];
+static int8_t allTemps[TOTAL_TEMPS];
+static bool tempValid[TOTAL_TEMPS];
+static uint32_t tempLastSeen[TOTAL_TEMPS];
 
 static uint32_t lastSubpackTx = 0;
-static uint32_t lastAddrClaimTx = 0;
-static uint32_t lastSummaryTx = 0;
-static uint32_t lastGeneralTx = 0;
-static uint32_t lastDebugPrint = 0;
-static uint8_t nextGeneralThermistorIndex = 0;
+static uint32_t lastOrionAddressTx = 0;
+static uint32_t lastOrionSummaryTx = 0;
+static uint32_t lastOrionGeneralTx = 0;
+static uint8_t nextGeneralIndex = 0;
 
 struct TempStats {
   bool valid;
-  int8_t lowTemp;
-  int8_t highTemp;
+  int8_t minTemp;
+  int8_t maxTemp;
   int8_t avgTemp;
-  uint8_t lowId;
-  uint8_t highId;
+  uint8_t minId;
+  uint8_t maxId;
   uint8_t count;
 };
 
 static bool init_can() {
-  twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX, CAN_RX, TWAI_MODE_NO_ACK);
+  twai_general_config_t g = TWAI_GENERAL_CONFIG_DEFAULT(CAN_TX, CAN_RX, TWAI_MODE_NORMAL);
   g.tx_queue_len = 25;
   g.rx_queue_len = 75;
->>>>>>> theirs
 
   twai_timing_config_t t = TWAI_TIMING_CONFIG_500KBITS();
   twai_filter_config_t f = TWAI_FILTER_CONFIG_ACCEPT_ALL();
@@ -103,90 +74,48 @@ static bool init_can() {
   twai_driver_uninstall();
 
   esp_err_t err = twai_driver_install(&g, &t, &f);
-  Serial.printf("twai_driver_install: %s\n", esp_err_to_name(err));
-<<<<<<< ours
-  if (err != ESP_OK) return false;
-
-  err = twai_start();
-  Serial.printf("twai_start: %s\n", esp_err_to_name(err));
-  if (err != ESP_OK) return false;
-
-  twai_initialized = true;
-
-  return true;
-}
-
-=======
   if (err != ESP_OK) {
-    twai_initialized = false;
+    Serial.printf("twai_driver_install failed: %s\n", esp_err_to_name(err));
+    canOk = false;
     return false;
   }
 
   err = twai_start();
-  Serial.printf("twai_start: %s\n", esp_err_to_name(err));
   if (err != ESP_OK) {
-    twai_initialized = false;
+    Serial.printf("twai_start failed: %s\n", esp_err_to_name(err));
+    canOk = false;
     return false;
   }
 
-  twai_initialized = true;
+  canOk = true;
   return true;
 }
 
-static void restart_can() {
-  twai_initialized = false;
-  twai_stop();
-  twai_driver_uninstall();
-  delay(50);
-  init_can();
-}
-
-static void check_bus_off() {
-  if (!twai_initialized) return;
+static void restart_can_if_bus_off() {
+  if (!canOk) return;
 
   twai_status_info_t st;
   if (twai_get_status_info(&st) == ESP_OK && st.state == TWAI_STATE_BUS_OFF) {
-    Serial.println("CAN bus-off, restarting TWAI");
-    restart_can();
+    canOk = false;
+    twai_stop();
+    twai_driver_uninstall();
+    delay(50);
+    init_can();
   }
 }
 
-static bool transmit_msg(const twai_message_t& msg, const char* label) {
-  if (!twai_initialized) return false;
+static bool send_can(const twai_message_t& msg) {
+  if (!canOk) return false;
 
   esp_err_t err = twai_transmit(&msg, pdMS_TO_TICKS(10));
   if (err == ESP_OK) return true;
 
-  Serial.printf("%s TX failed: %s\n", label, esp_err_to_name(err));
-  if (err == ESP_ERR_INVALID_STATE) restart_can();
+  if (err == ESP_ERR_INVALID_STATE) {
+    canOk = false;
+    init_can();
+  }
+
   return false;
-}
-
->>>>>>> theirs
-static float read_temperature() {
-  analogRead(ADC_PIN);
-  delayMicroseconds(20);
-
-  int32_t raw = 0;
-  for (int j = 0; j < 16; j++) raw += analogRead(ADC_PIN);
-<<<<<<< ours
-  adcValue = raw / 16.0f;
-
-  if (adcValue <= 0 || adcValue >= ADC_MAX) return 0.0f;
-
-  float R = R_FIXED * adcValue / (ADC_MAX - adcValue);
-  float lnR = logf(R);
-  float inv_T = SH_A + SH_B * lnR + SH_C * lnR * lnR * lnR;
-  return 1.0f / inv_T - 273.15f;
-=======
-
-  float adcValue = raw / 16.0f;
-  if (adcValue <= 0 || adcValue >= ADC_MAX) return 0.0f;
-
-  float rThermistor = R_FIXED * adcValue / (ADC_MAX - adcValue);
-  float lnR = logf(rThermistor);
-  float invT = SH_A + SH_B * lnR + SH_C * lnR * lnR * lnR;
-  return 1.0f / invT - 273.15f;
 }
 
 static int8_t clamp_temp(float tempC) {
@@ -195,234 +124,49 @@ static int8_t clamp_temp(float tempC) {
   return (int8_t)lroundf(tempC);
 }
 
-static void read_local_thermistors() {
+static float read_temperature_c() {
+  analogRead(ADC_PIN);
+  delayMicroseconds(20);
+
+  int32_t rawSum = 0;
+  for (uint8_t i = 0; i < 16; i++) rawSum += analogRead(ADC_PIN);
+
+  float adc = rawSum / 16.0f;
+  if (adc <= 0.0f || adc >= ADC_MAX) return 0.0f;
+
+  float resistance = R_FIXED * adc / (ADC_MAX - adc);
+  float lnR = logf(resistance);
+  float invK = SH_A + SH_B * lnR + SH_C * lnR * lnR * lnR;
+  return (1.0f / invK) - 273.15f;
+}
+
+static void read_local_temps() {
   bool fault = false;
 
-  for (uint8_t i = 0; i < THERMISTORS_PER_SUBPACK; i++) {
-    uint8_t channel = (i + 1) % THERMISTORS_PER_SUBPACK;  // T12 is mux channel 0
+  for (uint8_t i = 0; i < TEMPS_PER_SUBPACK; i++) {
+    uint8_t muxChannel = (i + 1) % TEMPS_PER_SUBPACK;  // T12 is mux channel 0
 
-    digitalWrite(MUX_S0, channel & 0x01);
-    digitalWrite(MUX_S1, (channel >> 1) & 0x01);
-    digitalWrite(MUX_S2, (channel >> 2) & 0x01);
-    digitalWrite(MUX_S3, (channel >> 3) & 0x01);
+    digitalWrite(MUX_S0, muxChannel & 0x01);
+    digitalWrite(MUX_S1, (muxChannel >> 1) & 0x01);
+    digitalWrite(MUX_S2, (muxChannel >> 2) & 0x01);
+    digitalWrite(MUX_S3, (muxChannel >> 3) & 0x01);
     delayMicroseconds(20);
 
-    float tempC = read_temperature();
-    if (tempC > FAULT_TEMP) fault = true;
+    float tempC = read_temperature_c();
+    if (tempC > FAULT_TEMP_C) fault = true;
     localTemps[i] = clamp_temp(tempC);
   }
 
   digitalWrite(FAULT_PIN, fault ? HIGH : LOW);
 }
 
-static void store_subpack_temps(uint8_t subpack, const int8_t temps[THERMISTORS_PER_SUBPACK]) {
-  if (subpack < 1 || subpack > NUM_SUBPACKS) return;
-
-  uint8_t base = (subpack - 1) * THERMISTORS_PER_SUBPACK;
-  uint32_t now = millis();
-
-  for (uint8_t i = 0; i < THERMISTORS_PER_SUBPACK; i++) {
-    uint8_t idx = base + i;
-    thermistorTemps[idx] = temps[i];
-    thermistorValid[idx] = true;
-    thermistorLastSeen[idx] = now;
-  }
-}
-
-static void clear_thermistor_data() {
-  for (uint8_t i = 0; i < TOTAL_THERMISTORS; i++) {
-    thermistorTemps[i] = 0;
-    thermistorValid[i] = false;
-    thermistorLastSeen[i] = 0;
-  }
-}
-
-static void mark_stale_thermistors() {
-  uint32_t now = millis();
-
-  for (uint8_t i = 0; i < TOTAL_THERMISTORS; i++) {
-    if (thermistorValid[i] && now - thermistorLastSeen[i] > THERMISTOR_STALE_MS) {
-      thermistorValid[i] = false;
-    }
-  }
-}
-
-static bool is_subpack_temp_id(uint32_t id) {
-  uint8_t subpack = (id >> 4) & 0x0F;
-  uint8_t half = id & 0x0F;
-  return subpack >= 1 && subpack <= NUM_SUBPACKS && (half == 1 || half == 2);
-}
-
-static void parse_subpack_temp_message(const twai_message_t& msg) {
-  if (msg.extd || msg.data_length_code < 6 || !is_subpack_temp_id(msg.identifier)) return;
-
-  uint8_t subpack = (msg.identifier >> 4) & 0x0F;
-  if (subpack == 1) return;  // master gets subpack 1 from its own ADCs
-
-  uint8_t half = msg.identifier & 0x0F;
-  uint8_t baseInSubpack = (half == 1) ? 0 : 6;
-  uint8_t globalBase = (subpack - 1) * THERMISTORS_PER_SUBPACK + baseInSubpack;
-  uint32_t now = millis();
-
-  for (uint8_t i = 0; i < 6; i++) {
-    uint8_t idx = globalBase + i;
-    thermistorTemps[idx] = (int8_t)msg.data[i];
-    thermistorValid[idx] = true;
-    thermistorLastSeen[idx] = now;
-  }
-}
-
-static void receive_can_messages() {
-  twai_message_t rxMsg;
-  while (twai_receive(&rxMsg, 0) == ESP_OK) {
-    parse_subpack_temp_message(rxMsg);
-  }
-}
-
-static void send_subpack_frames() {
-  twai_message_t msg;
-  memset(&msg, 0, sizeof(msg));
-  msg.extd = 0;
-  msg.data_length_code = 6;
-
-  msg.identifier = (subpackID << 4) | 0x01;
-  for (uint8_t i = 0; i < 6; i++) msg.data[i] = (uint8_t)localTemps[i];
-  transmit_msg(msg, "subpack temps 0-5");
-
-  msg.identifier = (subpackID << 4) | 0x02;
-  for (uint8_t i = 0; i < 6; i++) msg.data[i] = (uint8_t)localTemps[i + 6];
-  transmit_msg(msg, "subpack temps 6-11");
-}
-
-static TempStats compute_temperature_stats() {
-  TempStats stats = {};
-  int32_t sum = 0;
-
-  for (uint8_t i = 0; i < TOTAL_THERMISTORS; i++) {
-    if (!thermistorValid[i]) continue;
-
-    int8_t temp = thermistorTemps[i];
-    if (!stats.valid) {
-      stats.valid = true;
-      stats.lowTemp = temp;
-      stats.highTemp = temp;
-      stats.lowId = i;
-      stats.highId = i;
-    } else {
-      if (temp < stats.lowTemp) {
-        stats.lowTemp = temp;
-        stats.lowId = i;
-      }
-      if (temp > stats.highTemp) {
-        stats.highTemp = temp;
-        stats.highId = i;
-      }
-    }
-
-    sum += temp;
-    stats.count++;
-  }
-
-  if (stats.valid && stats.count > 0) {
-    stats.avgTemp = (int8_t)lroundf((float)sum / stats.count);
-  }
-
-  return stats;
-}
-
-static uint8_t checksum_orion_summary(const uint8_t data[8]) {
-  uint16_t sum = 0;
-  for (uint8_t i = 0; i < 7; i++) sum += data[i];
-  sum += 0x39;
-  sum += 8;
-  return (uint8_t)(sum & 0xFF);
-}
-
-static void send_orion_address_claim() {
-  twai_message_t msg;
-  memset(&msg, 0, sizeof(msg));
-
-  msg.identifier = ORION_ADDR_CLAIM_ID;
-  msg.extd = 1;
-  msg.data_length_code = 8;
-  msg.data[0] = 0xF3;
-  msg.data[1] = 0x00;
-  msg.data[2] = ORION_SOURCE_ADDRESS;
-  msg.data[3] = 0xF3;
-  msg.data[4] = ORION_MODULE_NUMBER << 3;
-  msg.data[5] = 0x40;
-  msg.data[6] = 0x1E;
-  msg.data[7] = 0x90;
-
-  transmit_msg(msg, "Orion address claim");
-}
-
-static void send_orion_summary_frame(const TempStats& stats) {
-  if (!stats.valid) return;
-
-  twai_message_t msg;
-  memset(&msg, 0, sizeof(msg));
-
-  msg.identifier = ORION_SUMMARY_ID;
-  msg.extd = 1;
-  msg.data_length_code = 8;
-  msg.data[0] = ORION_MODULE_NUMBER;
-  msg.data[1] = (uint8_t)stats.lowTemp;
-  msg.data[2] = (uint8_t)stats.highTemp;
-  msg.data[3] = (uint8_t)stats.avgTemp;
-  msg.data[4] = stats.count;
-  msg.data[5] = stats.highId;
-  msg.data[6] = stats.lowId;
-  msg.data[7] = checksum_orion_summary(msg.data);
-
-  transmit_msg(msg, "Orion summary");
-}
-
-static bool find_next_valid_thermistor(uint8_t* indexOut) {
-  for (uint8_t attempts = 0; attempts < TOTAL_THERMISTORS; attempts++) {
-    uint8_t idx = nextGeneralThermistorIndex++;
-    if (nextGeneralThermistorIndex >= TOTAL_THERMISTORS) nextGeneralThermistorIndex = 0;
-
-    if (thermistorValid[idx]) {
-      *indexOut = idx;
-      return true;
-    }
-  }
-
-  return false;
-}
-
-static void send_orion_general_broadcast_frame(const TempStats& stats) {
-  if (!stats.valid) return;
-
-  uint8_t thermistorIndex = 0;
-  if (!find_next_valid_thermistor(&thermistorIndex)) return;
-
-  twai_message_t msg;
-  memset(&msg, 0, sizeof(msg));
-
-  msg.identifier = ORION_GENERAL_ID;
-  msg.extd = 1;
-  msg.data_length_code = 8;
-  msg.data[0] = thermistorIndex;
-  msg.data[1] = (uint8_t)thermistorTemps[thermistorIndex];
-  msg.data[2] = thermistorIndex;
-  msg.data[3] = (uint8_t)stats.lowTemp;
-  msg.data[4] = (uint8_t)stats.highTemp;
-  msg.data[5] = stats.highId;
-  msg.data[6] = stats.lowId;
-  msg.data[7] = 0x80;
-
-  transmit_msg(msg, "Orion general");
-}
-
-static uint8_t detect_subpack_id() {
-  pinMode(GPIO_NUM_11, INPUT);  // D19
-  pinMode(GPIO_NUM_7, INPUT);   // D8
-  pinMode(GPIO_NUM_12, INPUT);  // D18
-  pinMode(GPIO_NUM_8, INPUT);   // D9
-  pinMode(GPIO_NUM_13, INPUT);  // D17
-  pinMode(GPIO_NUM_9, INPUT);   // D10
+static uint8_t read_subpack_id() {
+  pinMode(GPIO_NUM_11, INPUT);  // subpack 1
+  pinMode(GPIO_NUM_7, INPUT);   // subpack 2
+  pinMode(GPIO_NUM_12, INPUT);  // subpack 3
+  pinMode(GPIO_NUM_8, INPUT);   // subpack 4
+  pinMode(GPIO_NUM_13, INPUT);  // subpack 5
+  pinMode(GPIO_NUM_9, INPUT);   // subpack 6
 
   if (digitalRead(GPIO_NUM_11) == HIGH) return 1;
   if (digitalRead(GPIO_NUM_7) == HIGH) return 2;
@@ -433,201 +177,242 @@ static uint8_t detect_subpack_id() {
   return 1;
 }
 
-static void print_debug(const TempStats& stats) {
-  Serial.printf("Subpack %u mode=%s\n", subpackID, isMaster ? "master" : "sender");
+static void save_temps(uint8_t pack, uint8_t firstTemp, const uint8_t* data, uint8_t len) {
+  if (pack < 1 || pack > NUM_SUBPACKS) return;
 
-  if (isMaster && stats.valid) {
-    Serial.printf(
-      "Orion stats: count=%u low=%d id=%u high=%d id=%u avg=%d next=%u\n",
-      stats.count,
-      stats.lowTemp,
-      stats.lowId,
-      stats.highTemp,
-      stats.highId,
-      stats.avgTemp,
-      nextGeneralThermistorIndex
-    );
+  uint8_t base = (pack - 1) * TEMPS_PER_SUBPACK + firstTemp;
+  uint32_t now = millis();
+
+  for (uint8_t i = 0; i < len; i++) {
+    uint8_t index = base + i;
+    if (index >= TOTAL_TEMPS) return;
+
+    allTemps[index] = (int8_t)data[i];
+    tempValid[index] = true;
+    tempLastSeen[index] = now;
   }
->>>>>>> theirs
+}
+
+static void save_local_master_temps() {
+  uint32_t now = millis();
+
+  for (uint8_t i = 0; i < TEMPS_PER_SUBPACK; i++) {
+    allTemps[i] = localTemps[i];
+    tempValid[i] = true;
+    tempLastSeen[i] = now;
+  }
+}
+
+static void receive_subpack_messages() {
+  twai_message_t msg;
+
+  while (twai_receive(&msg, 0) == ESP_OK) {
+    if (msg.extd || msg.data_length_code < 6) continue;
+
+    uint8_t pack = (msg.identifier >> 4) & 0x0F;
+    uint8_t half = msg.identifier & 0x0F;
+
+    if (pack < 2 || pack > NUM_SUBPACKS) continue;
+    if (half == 1) save_temps(pack, 0, msg.data, 6);
+    if (half == 2) save_temps(pack, 6, msg.data, 6);
+  }
+}
+
+static void mark_stale_temps() {
+  uint32_t now = millis();
+
+  for (uint8_t i = 0; i < TOTAL_TEMPS; i++) {
+    if (tempValid[i] && now - tempLastSeen[i] > STALE_TEMP_MS) {
+      tempValid[i] = false;
+    }
+  }
+}
+
+static TempStats get_stats() {
+  TempStats stats = {};
+  int32_t sum = 0;
+
+  for (uint8_t i = 0; i < TOTAL_TEMPS; i++) {
+    if (!tempValid[i]) continue;
+
+    int8_t temp = allTemps[i];
+
+    if (!stats.valid) {
+      stats.valid = true;
+      stats.minTemp = temp;
+      stats.maxTemp = temp;
+      stats.minId = i;
+      stats.maxId = i;
+    }
+
+    if (temp < stats.minTemp) {
+      stats.minTemp = temp;
+      stats.minId = i;
+    }
+
+    if (temp > stats.maxTemp) {
+      stats.maxTemp = temp;
+      stats.maxId = i;
+    }
+
+    sum += temp;
+    stats.count++;
+  }
+
+  if (stats.valid) {
+    stats.avgTemp = (int8_t)lroundf((float)sum / stats.count);
+  }
+
+  return stats;
+}
+
+static uint8_t orion_summary_checksum(const uint8_t data[8]) {
+  uint16_t sum = 0;
+  for (uint8_t i = 0; i < 7; i++) sum += data[i];
+  sum += 0x39;
+  sum += 8;
+  return (uint8_t)sum;
+}
+
+static void send_subpack_temps() {
+  twai_message_t msg = {};
+  msg.extd = 0;
+  msg.data_length_code = 6;
+
+  msg.identifier = (subpackId << 4) | 0x01;
+  for (uint8_t i = 0; i < 6; i++) msg.data[i] = (uint8_t)localTemps[i];
+  send_can(msg);
+
+  msg.identifier = (subpackId << 4) | 0x02;
+  for (uint8_t i = 0; i < 6; i++) msg.data[i] = (uint8_t)localTemps[i + 6];
+  send_can(msg);
+}
+
+static void send_orion_address_claim() {
+  twai_message_t msg = {};
+  msg.identifier = ORION_ADDRESS_ID;
+  msg.extd = 1;
+  msg.data_length_code = 8;
+  msg.data[0] = 0xF3;
+  msg.data[1] = 0x00;
+  msg.data[2] = ORION_SOURCE_ADDRESS;
+  msg.data[3] = 0xF3;
+  msg.data[4] = ORION_MODULE_NUMBER << 3;
+  msg.data[5] = 0x40;
+  msg.data[6] = 0x1E;
+  msg.data[7] = 0x90;
+  send_can(msg);
+}
+
+static void send_orion_summary(const TempStats& stats) {
+  if (!stats.valid) return;
+
+  twai_message_t msg = {};
+  msg.identifier = ORION_SUMMARY_ID;
+  msg.extd = 1;
+  msg.data_length_code = 8;
+  msg.data[0] = ORION_MODULE_NUMBER;
+  msg.data[1] = (uint8_t)stats.minTemp;
+  msg.data[2] = (uint8_t)stats.maxTemp;
+  msg.data[3] = (uint8_t)stats.avgTemp;
+  msg.data[4] = TOTAL_TEMPS;
+  msg.data[5] = stats.maxId;
+  msg.data[6] = stats.minId;
+  msg.data[7] = orion_summary_checksum(msg.data);
+  send_can(msg);
+}
+
+static void send_orion_general(const TempStats& stats) {
+  if (!stats.valid) return;
+
+  for (uint8_t tries = 0; tries < TOTAL_TEMPS; tries++) {
+    uint8_t id = nextGeneralIndex++;
+    if (nextGeneralIndex >= TOTAL_TEMPS) nextGeneralIndex = 0;
+    if (!tempValid[id]) continue;
+
+    twai_message_t msg = {};
+    msg.identifier = ORION_GENERAL_ID;
+    msg.extd = 1;
+    msg.data_length_code = 8;
+    msg.data[0] = id;
+    msg.data[1] = (uint8_t)allTemps[id];
+    msg.data[2] = id;
+    msg.data[3] = (uint8_t)stats.minTemp;
+    msg.data[4] = (uint8_t)stats.maxTemp;
+    msg.data[5] = stats.maxId;
+    msg.data[6] = stats.minId;
+    msg.data[7] = 0x80;
+    send_can(msg);
+    return;
+  }
 }
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(MUX_ENBLE, OUTPUT);
-  pinMode(MUX_S3, OUTPUT);
-  pinMode(MUX_S2, OUTPUT);
-  pinMode(MUX_S1, OUTPUT);
+  pinMode(MUX_EN, OUTPUT);
   pinMode(MUX_S0, OUTPUT);
+  pinMode(MUX_S1, OUTPUT);
+  pinMode(MUX_S2, OUTPUT);
+  pinMode(MUX_S3, OUTPUT);
   pinMode(FAULT_PIN, OUTPUT_OPEN_DRAIN);
+
+  digitalWrite(MUX_EN, LOW);
   digitalWrite(FAULT_PIN, LOW);
-  digitalWrite(MUX_ENBLE, LOW);
 
   Serial.begin(115200);
   delay(500);
+
   analogReadResolution(12);
   analogSetAttenuation(ADC_11db);
 
-<<<<<<< ours
-  if (!init_can()) {
-    Serial.println("CAN init failed!");
-    while (1) {}
+  subpackId = read_subpack_id();
+  isMaster = subpackId == 1;
+
+  for (uint8_t i = 0; i < TOTAL_TEMPS; i++) {
+    tempValid[i] = false;
+    tempLastSeen[i] = 0;
   }
-
-  memset(&CAN_outMsg1, 0, sizeof(CAN_outMsg1));
-  memset(&CAN_outMsg2, 0, sizeof(CAN_outMsg2));
-
-  pinMode(GPIO_NUM_11, INPUT);  // D19
-  pinMode(GPIO_NUM_7, INPUT);  // D8
-  pinMode(GPIO_NUM_12, INPUT);  // D18
-  pinMode(GPIO_NUM_8, INPUT);  // D9
-  pinMode(GPIO_NUM_13, INPUT);  // D17
-  pinMode(GPIO_NUM_9, INPUT);  // D10
-
-  if (digitalRead(GPIO_NUM_11) == HIGH) subpackID = 1;
-  else if (digitalRead(GPIO_NUM_7) == HIGH) subpackID = 2;
-  else if (digitalRead(GPIO_NUM_12) == HIGH) subpackID = 3;
-  else if (digitalRead(GPIO_NUM_8) == HIGH) subpackID = 4;
-  else if (digitalRead(GPIO_NUM_13) == HIGH) subpackID = 5;
-  else if (digitalRead(GPIO_NUM_9) == HIGH) subpackID = 6;
-  else subpackID = 1;  // default to 1 if no pin is high
-
-  switch (subpackID) {
-    case 1: CAN_outMsg1.identifier = 0x11; CAN_outMsg2.identifier = 0x12; break;
-    case 2: CAN_outMsg1.identifier = 0x21; CAN_outMsg2.identifier = 0x22; break;
-    case 3: CAN_outMsg1.identifier = 0x31; CAN_outMsg2.identifier = 0x32; break;
-    case 4: CAN_outMsg1.identifier = 0x41; CAN_outMsg2.identifier = 0x42; break;
-    case 5: CAN_outMsg1.identifier = 0x51; CAN_outMsg2.identifier = 0x52; break;
-    case 6: CAN_outMsg1.identifier = 0x61; CAN_outMsg2.identifier = 0x62; break;
-  }
-  CAN_outMsg1.data_length_code = 6;
-  CAN_outMsg2.data_length_code = 6;
-=======
-  subpackID = detect_subpack_id();
-  isMaster = subpackID == 1;
-  clear_thermistor_data();
 
   if (!init_can()) {
-    Serial.println("CAN init failed!");
-    while (1) delay(500);
+    while (true) delay(500);
   }
 
-  Serial.printf("Thermistor board started as subpack %u (%s)\n",
-                subpackID,
-                isMaster ? "master aggregator" : "subpack sender");
->>>>>>> theirs
+  Serial.printf("Subpack %u, mode: %s\n", subpackId, isMaster ? "master to Orion" : "sender to master");
 }
 
 void loop() {
   digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-<<<<<<< ours
+  restart_can_if_bus_off();
+  read_local_temps();
 
-  twai_status_info_t st;
-  if (twai_get_status_info(&st) == ESP_OK && st.state == TWAI_STATE_BUS_OFF) {
-    twai_stop();
-    twai_driver_uninstall();
-    delay(50);
-    init_can();
-    delay(10);
+  uint32_t now = millis();
+
+  if (!isMaster) {
+    if (now - lastSubpackTx >= SUBPACK_TX_PERIOD_MS) {
+      lastSubpackTx = now;
+      send_subpack_temps();
+    }
     return;
   }
 
-  uint8_t temp[12] = {0};
-  for (int i = 0; i < 12; i++) {
-    int channel = (i + 1) % 12;  // T12 has binary b0000, others are fine
-    // selecting the mux channel
-    digitalWrite(MUX_S0, channel % 2);
-    digitalWrite(MUX_S1, (channel / 2) % 2);
-    digitalWrite(MUX_S2, (channel / 4) % 2);
-    digitalWrite(MUX_S3, (channel / 8) % 2);
-    delayMicroseconds(20);
+  save_local_master_temps();
+  receive_subpack_messages();
+  mark_stale_temps();
 
-    temperature = read_temperature();
-    if (temperature > FAULT_TEMP) digitalWrite(FAULT_PIN, HIGH);
-    temp[i] = (uint8_t)temperature;
+  TempStats stats = get_stats();
+
+  if (now - lastOrionAddressTx >= ORION_ADDRESS_PERIOD_MS) {
+    lastOrionAddressTx = now;
+    send_orion_address_claim();
   }
 
-  for (int i = 0; i < 6; i++) {
-    CAN_outMsg1.data[i] = temp[i];
-    CAN_outMsg2.data[i] = temp[i + 6];
-  }
-  
-  if(twai_initialized) {
-    esp_err_t err1 = twai_transmit(&CAN_outMsg1, pdMS_TO_TICKS(10));
-    esp_err_t err2 = twai_transmit(&CAN_outMsg2, pdMS_TO_TICKS(10));
-    // twai_status_info_t st;
-    // if (twai_get_status_info(&st) == ESP_OK && st.state == TWAI_STATE_BUS_OFF) {
-    if(err1 == ESP_ERR_INVALID_STATE || err2 == ESP_ERR_INVALID_STATE) {
-      Serial.println("Bus off detected before transmission, resetting TWAI...");
-      twai_initialized = false;
-      twai_stop();
-      twai_driver_uninstall();
-      delay(10);
-      init_can();
-    } else {
-      Serial.println(err1 == ESP_OK ? "MSG1 sent" : "MSG1 FAILED");
-      Serial.println(err2 == ESP_OK ? "MSG2 sent" : "MSG2 FAILED");
-    }
-  }
-  // esp_err_t err1 = twai_transmit((twai_message_t*)&CAN_outMsg1, pdMS_TO_TICKS(10));
-  // esp_err_t err2 = twai_transmit((twai_message_t*)&CAN_outMsg2, pdMS_TO_TICKS(10));
-
-  
-
-  Serial.print("MSG1 (0x");
-  Serial.print(CAN_outMsg1.identifier, HEX);
-  Serial.print("): ");
-  for (int i = 0; i < CAN_outMsg1.data_length_code; i++) {
-      Serial.print(CAN_outMsg1.data[i]);
-      Serial.print(" ");
-  }
-  Serial.println();
-
-  Serial.print("MSG2 (0x");
-  Serial.print(CAN_outMsg2.identifier, HEX);
-  Serial.print("): ");
-  for (int i = 0; i < CAN_outMsg2.data_length_code; i++) {
-      Serial.print(CAN_outMsg2.data[i]);
-      Serial.print(" ");
-  }
-  Serial.println();
-
-  delay(SEND_DELAY_MS);
-=======
-  check_bus_off();
-
-  read_local_thermistors();
-
-  uint32_t now = millis();
-  TempStats stats = {};
-
-  if (isMaster) {
-    store_subpack_temps(1, localTemps);
-    receive_can_messages();
-    mark_stale_thermistors();
-    stats = compute_temperature_stats();
-
-    if (now - lastAddrClaimTx >= ORION_ADDR_CLAIM_PERIOD_MS) {
-      lastAddrClaimTx = now;
-      send_orion_address_claim();
-    }
-
-    if (now - lastSummaryTx >= ORION_SUMMARY_PERIOD_MS) {
-      lastSummaryTx = now;
-      send_orion_summary_frame(stats);
-    }
-
-    if (now - lastGeneralTx >= ORION_GENERAL_PERIOD_MS) {
-      lastGeneralTx = now;
-      send_orion_general_broadcast_frame(stats);
-    }
-  } else if (now - lastSubpackTx >= SUBPACK_SEND_PERIOD_MS) {
-    lastSubpackTx = now;
-    send_subpack_frames();
+  if (now - lastOrionSummaryTx >= ORION_SUMMARY_PERIOD_MS) {
+    lastOrionSummaryTx = now;
+    send_orion_summary(stats);
   }
 
-  if (now - lastDebugPrint >= DEBUG_PRINT_PERIOD_MS) {
-    lastDebugPrint = now;
-    print_debug(stats);
+  if (now - lastOrionGeneralTx >= ORION_GENERAL_PERIOD_MS) {
+    lastOrionGeneralTx = now;
+    send_orion_general(stats);
   }
->>>>>>> theirs
 }

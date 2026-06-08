@@ -24,6 +24,8 @@ static constexpr uint32_t SUBPACK_TX_PERIOD_MS = 100;
 static constexpr uint32_t ORION_ADDRESS_PERIOD_MS = 200;
 static constexpr uint32_t ORION_SUMMARY_PERIOD_MS = 100;
 static constexpr uint32_t ORION_GENERAL_PERIOD_MS = 100;
+static constexpr uint32_t CAN_FRAME_GAP_MS = 100;  // Test gap so frames are easy to see on a scope.
+static constexpr uint32_t MASTER_LOOP_DELAY_MS = 100;
 static constexpr uint32_t STALE_TEMP_MS = 2000;
 
 static constexpr uint32_t ORION_ADDRESS_ID = 0x18EEFF80;
@@ -37,6 +39,20 @@ static constexpr float SH_B = 2.3230e-4f;
 static constexpr float SH_C = 9.5816e-8f;
 static constexpr float R_FIXED = 10000.0f;
 static constexpr float ADC_MAX = 4095.0f;
+
+struct SubpackIdPin {
+  uint8_t id;
+  gpio_num_t pin;
+};
+
+static constexpr SubpackIdPin SUBPACK_ID_PINS[NUM_SUBPACKS] = {
+  {1, GPIO_NUM_11},  // D19
+  {2, GPIO_NUM_7},   // D8
+  {3, GPIO_NUM_12},  // D18
+  {4, GPIO_NUM_8},   // D9
+  {5, GPIO_NUM_13},  // D17
+  {6, GPIO_NUM_9},   // D10
+};
 
 static uint8_t subpackId = 1;
 static bool isMaster = false;
@@ -108,7 +124,10 @@ static bool send_can(const twai_message_t& msg) {
   if (!canOk) return false;
 
   esp_err_t err = twai_transmit(&msg, pdMS_TO_TICKS(10));
-  if (err == ESP_OK) return true;
+  if (err == ESP_OK) {
+    delay(CAN_FRAME_GAP_MS);
+    return true;
+  }
 
   if (err == ESP_ERR_INVALID_STATE) {
     canOk = false;
@@ -161,19 +180,28 @@ static void read_local_temps() {
 }
 
 static uint8_t read_subpack_id() {
-  pinMode(GPIO_NUM_11, INPUT);  // subpack 1
-  pinMode(GPIO_NUM_7, INPUT);   // subpack 2
-  pinMode(GPIO_NUM_12, INPUT);  // subpack 3
-  pinMode(GPIO_NUM_8, INPUT);   // subpack 4
-  pinMode(GPIO_NUM_13, INPUT);  // subpack 5
-  pinMode(GPIO_NUM_9, INPUT);   // subpack 6
 
-  if (digitalRead(GPIO_NUM_11) == HIGH) return 1;
-  if (digitalRead(GPIO_NUM_7) == HIGH) return 2;
-  if (digitalRead(GPIO_NUM_12) == HIGH) return 3;
-  if (digitalRead(GPIO_NUM_8) == HIGH) return 4;
-  if (digitalRead(GPIO_NUM_13) == HIGH) return 5;
-  if (digitalRead(GPIO_NUM_9) == HIGH) return 6;
+
+  uint8_t detectedId = 0;
+  uint8_t detectedCount = 0;
+
+  for (const SubpackIdPin& idPin : SUBPACK_ID_PINS) {
+    pinMode(idPin.pin, INPUT);
+
+    if (digitalRead(idPin.pin) == HIGH) {
+      if (detectedId == 0) detectedId = idPin.id;
+      detectedCount++;
+    }
+  }
+
+  if (detectedCount == 1) return detectedId;
+
+  if (detectedCount > 1) {
+    Serial.printf("Multiple subpack ID pins high; using first detected ID %u\n", detectedId);
+    return detectedId;
+  }
+
+  Serial.println("No subpack ID pin high; defaulting to master subpack 1");
   return 1;
 }
 
@@ -274,6 +302,10 @@ static uint8_t orion_summary_checksum(const uint8_t data[8]) {
   return (uint8_t)sum;
 }
 
+static uint8_t orion_module_thermistor_id(uint8_t thermistorId) {
+  return thermistorId;
+}
+
 static void send_subpack_temps() {
   twai_message_t msg = {};
   msg.extd = 0;
@@ -336,14 +368,44 @@ static void send_orion_general(const TempStats& stats) {
     msg.data_length_code = 8;
     msg.data[0] = id;
     msg.data[1] = (uint8_t)allTemps[id];
-    msg.data[2] = id;
+    msg.data[2] = orion_module_thermistor_id(id);
     msg.data[3] = (uint8_t)stats.minTemp;
     msg.data[4] = (uint8_t)stats.maxTemp;
     msg.data[5] = stats.maxId;
-    msg.data[6] = stats.minId;
-    msg.data[7] = 0x80;
+    msg.data[6] = orion_module_thermistor_id(stats.maxId);
+    msg.data[7] = orion_module_thermistor_id(stats.minId);
     send_can(msg);
     return;
+  }
+}
+
+static void run_sender_subpack(uint32_t now) {
+  if (now - lastSubpackTx >= SUBPACK_TX_PERIOD_MS) {
+    lastSubpackTx = now;
+    send_subpack_temps();
+  }
+}
+
+static void run_master_subpack(uint32_t now) {
+  save_local_master_temps();
+  receive_subpack_messages();
+  mark_stale_temps();
+
+  TempStats stats = get_stats();
+
+  if (now - lastOrionAddressTx >= ORION_ADDRESS_PERIOD_MS) {
+    lastOrionAddressTx = now;
+    send_orion_address_claim();
+  }
+
+  if (now - lastOrionSummaryTx >= ORION_SUMMARY_PERIOD_MS) {
+    lastOrionSummaryTx = now;
+    send_orion_summary(stats);
+  }
+
+  if (now - lastOrionGeneralTx >= ORION_GENERAL_PERIOD_MS) {
+    lastOrionGeneralTx = now;
+    send_orion_general(stats);
   }
 }
 
@@ -388,31 +450,10 @@ void loop() {
   uint32_t now = millis();
 
   if (!isMaster) {
-    if (now - lastSubpackTx >= SUBPACK_TX_PERIOD_MS) {
-      lastSubpackTx = now;
-      send_subpack_temps();
-    }
+    run_sender_subpack(now);
     return;
   }
 
-  save_local_master_temps();
-  receive_subpack_messages();
-  mark_stale_temps();
-
-  TempStats stats = get_stats();
-
-  if (now - lastOrionAddressTx >= ORION_ADDRESS_PERIOD_MS) {
-    lastOrionAddressTx = now;
-    send_orion_address_claim();
-  }
-
-  if (now - lastOrionSummaryTx >= ORION_SUMMARY_PERIOD_MS) {
-    lastOrionSummaryTx = now;
-    send_orion_summary(stats);
-  }
-
-  if (now - lastOrionGeneralTx >= ORION_GENERAL_PERIOD_MS) {
-    lastOrionGeneralTx = now;
-    send_orion_general(stats);
-  }
+  run_master_subpack(now);
+  delay(MASTER_LOOP_DELAY_MS);
 }
